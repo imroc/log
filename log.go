@@ -40,7 +40,7 @@ const (
 
 // Log level strings
 var (
-	levelStrings = [...]string{"DEBG", "INFO", "WARN", "EROR", "FATL"}
+	levelStrings = [...]string{"[DEBG]", "[INFO]", "[WARN]", "[EROR]", "[FATL]"}
 )
 
 // A Logger represents an active logging object that generates lines of
