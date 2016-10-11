@@ -48,10 +48,10 @@ log.Fatal("%s message", "fatal")
 ```
 output to test.log:
 ```
-2016/10/04 15:04:00 INFO /home/cpwl/go/dev/src/test/test.go:13: info message
-2016/10/04 15:04:00 WARN /home/cpwl/go/dev/src/test/test.go:14: warn message
-2016/10/04 15:04:00 EROR /home/cpwl/go/dev/src/test/test.go:15: error message
-2016/10/04 15:04:00 FATL /home/cpwl/go/dev/src/test/test.go:16: fatal message
+2016/10/04 15:04:00 [INFO] /home/cpwl/go/dev/src/test/test.go:13: info message
+2016/10/04 15:04:00 [WARN] /home/cpwl/go/dev/src/test/test.go:14: warn message
+2016/10/04 15:04:00 [EROR] /home/cpwl/go/dev/src/test/test.go:15: error message
+2016/10/04 15:04:00 [FATL] /home/cpwl/go/dev/src/test/test.go:16: fatal message
 ```
 ## LICENSE
 log is is distributed under the terms of the MIT License.
