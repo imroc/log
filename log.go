@@ -20,53 +20,23 @@ const (
 	//	2009/01/23 01:23:23 message
 	// while flags Ldate | Ltime | Lmicroseconds | Llongfile produce,
 	//	2009/01/23 01:23:23.123123 /a/b/c/d.go:23: message
-	Ldate         = 1 << iota     // the date in the local time zone: 2009/01/23
-	Ltime                         // the time in the local time zone: 01:23:23
-	Lmicroseconds                 // microsecond resolution: 01:23:23.123123.  assumes Ltime.
-	Llongfile                     // full file name and line number: /a/b/c/d.go:23
-	Lshortfile                    // final file name element and line number: d.go:23. overrides Llongfile
-	LUTC                          // if Ldate or Ltime is set, use UTC rather than the local time zone
-	LstdFlags     = Ldate | Ltime // initial values for the standard logger
+	Ldate         = 1 << iota                  // the date in the local time zone: 2009/01/23
+	Ltime                                      // the time in the local time zone: 01:23:23
+	Lmicroseconds                              // microsecond resolution: 01:23:23.123123.  assumes Ltime.
+	Llongfile                                  // full file name and line number: /a/b/c/d.go:23
+	Lshortfile                                 // final file name element and line number: d.go:23. overrides Llongfile
+	LUTC                                       // if Ldate or Ltime is set, use UTC rather than the local time zone
+	LstdFlags     = Ldate | Ltime | Lshortfile // initial values for the standard logger
 )
 
-// log levels
-const (
-	DEBUG int = iota
-	INFO
-	WARN
-	ERROR
-	FATAL
-)
-
-// Log level strings
-var (
-	levelStrings = [...]string{"[DEBG]", "[INFO]", "[WARN]", "[EROR]", "[FATL]"}
-)
-
-// A Logger represents an active logging object that generates lines of
-// output to an io.Writer. Each logging operation makes a single call to
-// the Writer's Write method. A Logger can be used simultaneously from
-// multiple goroutines; it guarantees to serialize access to the Writer.
-type Logger struct {
-	level int        // log level
-	mu    sync.Mutex // ensures atomic writes; protects the following fields
-	flag  int        // properties
-	out   io.Writer  // destination for output
-	buf   []byte     // for accumulating text to write
-}
-
-// Set sets the wirter,log level and flags.
-func Set(level int, out io.Writer, flag int) {
-	if out == nil || level < DEBUG || level > FATAL {
-		panic("error logger arguments")
-	}
-	std = Logger{out: out, level: level, flag: flag}
-}
-
-var std = Logger{out: os.Stderr, level: DEBUG, flag: LstdFlags}
+var DEBUG bool
+var FLAG int = LstdFlags
+var OUT io.Writer = os.Stderr // destination for output
+var mu sync.Mutex             // ensures atomic writes; protects the following fields
+var buf []byte                // for accumulating text to write
 
 // Cheap integer to fixed-width decimal ASCII.  Give a negative width to avoid zero-padding.
-func itoa(buf *[]byte, i int, wid int) {
+func itoa(i int, wid int) {
 	// Assemble decimal in reverse order.
 	var b [20]byte
 	bp := len(b) - 1
@@ -79,43 +49,43 @@ func itoa(buf *[]byte, i int, wid int) {
 	}
 	// i < 10
 	b[bp] = byte('0' + i)
-	*buf = append(*buf, b[bp:]...)
+	buf = append(buf, b[bp:]...)
 }
 
-func (l *Logger) formatHeader(buf *[]byte, t time.Time, level string, file string, line int) {
-	if l.flag&LUTC != 0 {
+func formatHeader(t time.Time, level string, file string, line int) {
+	if FLAG&LUTC != 0 {
 		t = t.UTC()
 	}
-	if l.flag&(Ldate|Ltime|Lmicroseconds) != 0 {
-		if l.flag&Ldate != 0 {
+	if FLAG&(Ldate|Ltime|Lmicroseconds) != 0 {
+		if FLAG&Ldate != 0 {
 			year, month, day := t.Date()
-			itoa(buf, year, 4)
-			*buf = append(*buf, '/')
-			itoa(buf, int(month), 2)
-			*buf = append(*buf, '/')
-			itoa(buf, day, 2)
-			*buf = append(*buf, ' ')
+			itoa(year, 4)
+			buf = append(buf, '/')
+			itoa(int(month), 2)
+			buf = append(buf, '/')
+			itoa(day, 2)
+			buf = append(buf, ' ')
 		}
-		if l.flag&(Ltime|Lmicroseconds) != 0 {
+		if FLAG&(Ltime|Lmicroseconds) != 0 {
 			hour, min, sec := t.Clock()
-			itoa(buf, hour, 2)
-			*buf = append(*buf, ':')
-			itoa(buf, min, 2)
-			*buf = append(*buf, ':')
-			itoa(buf, sec, 2)
-			if l.flag&Lmicroseconds != 0 {
-				*buf = append(*buf, '.')
-				itoa(buf, t.Nanosecond()/1e3, 6)
+			itoa(hour, 2)
+			buf = append(buf, ':')
+			itoa(min, 2)
+			buf = append(buf, ':')
+			itoa(sec, 2)
+			if FLAG&Lmicroseconds != 0 {
+				buf = append(buf, '.')
+				itoa(t.Nanosecond()/1e3, 6)
 			}
-			*buf = append(*buf, ' ')
+			buf = append(buf, ' ')
 		}
 	}
 
-	*buf = append(*buf, level...)
-	*buf = append(*buf, ' ')
+	buf = append(buf, level...)
+	buf = append(buf, ' ')
 
-	if l.flag&(Lshortfile|Llongfile) != 0 {
-		if l.flag&Lshortfile != 0 {
+	if FLAG&(Lshortfile|Llongfile) != 0 {
+		if FLAG&Lshortfile != 0 {
 			short := file
 			for i := len(file) - 1; i > 0; i-- {
 				if file[i] == '/' {
@@ -125,103 +95,75 @@ func (l *Logger) formatHeader(buf *[]byte, t time.Time, level string, file strin
 			}
 			file = short
 		}
-		*buf = append(*buf, file...)
-		*buf = append(*buf, ':')
-		itoa(buf, line, -1)
-		*buf = append(*buf, ": "...)
+		buf = append(buf, file...)
+		buf = append(buf, ':')
+		itoa(line, -1)
+		buf = append(buf, ": "...)
 	}
 }
 
-// Output outputs the string of lv level to the writer.
-func (l *Logger) Output(lv int, s string) error {
+// Output outputs the string of with level to the writer.
+func Output(level string, s string) error {
 	now := time.Now() // get this early.
 	var file string
 	var line int
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.flag&(Lshortfile|Llongfile) != 0 {
+	mu.Lock()
+	defer mu.Unlock()
+	if FLAG&(Lshortfile|Llongfile) != 0 {
 		// release lock while getting caller info - it's expensive.
-		l.mu.Unlock()
+		mu.Unlock()
 		var ok bool
 		_, file, line, ok = runtime.Caller(2)
 		if !ok {
 			file = "???"
 			line = 0
 		}
-		l.mu.Lock()
+		mu.Lock()
 	}
-	l.buf = l.buf[:0]
-	l.formatHeader(&l.buf, now, levelStrings[lv], file, line)
-	l.buf = append(l.buf, s...)
+	buf = buf[:0] // clear buffer
+	formatHeader(now, level, file, line)
+	buf = append(buf, s...)
 	if len(s) == 0 || s[len(s)-1] != '\n' {
-		l.buf = append(l.buf, '\n')
+		buf = append(buf, '\n')
 	}
-	_, err := l.out.Write(l.buf)
+	_, err := OUT.Write(buf)
 	return err
 }
 
-// SetOutput sets the output destination for the standard logger.
-func SetOutput(w io.Writer) {
-	if w == nil {
-		panic("output can not be nil")
-	}
-	std.mu.Lock()
-	defer std.mu.Unlock()
-	std.out = w
-}
-
-//SetLevel sets the log level for the standard logger.
-func SetLevel(level int) {
-	if level < DEBUG || level > FATAL {
-		panic("wrong log level")
-	}
-	std.mu.Lock()
-	defer std.mu.Unlock()
-	std.level = level
-
-}
-
-// SetFlags sets the output flags for the standard logger.
-func SetFlags(flag int) {
-	std.flag = flag
-}
-
-// Debug output the debug info if currrent level is not less than DEBUG.
-func Debug(format string, a ...interface{}) {
-	if DEBUG < std.level {
+// Debug output the debug info if DEBUG is set to true.
+func Debug(a ...interface{}) {
+	if !DEBUG {
 		return
 	}
-	std.Output(DEBUG, fmt.Sprintf(format, a...))
+	Output("[DEBG]", fmt.Sprint(a...))
 }
 
-// Info output the debug info if currrent level is not less than INFO.
-func Info(format string, a ...interface{}) {
-	if INFO < std.level {
+// Debugf output the formated debug info if DEBUG is set to true.
+func Debugf(format string, a ...interface{}) {
+	if !DEBUG {
 		return
 	}
-	std.Output(INFO, fmt.Sprintf(format, a...))
+	Output("[DEBG]", fmt.Sprintf(format, a...))
 }
 
-// Warn output the debug info if currrent level is not less than WARN.
-func Warn(format string, a ...interface{}) {
-	if WARN < std.level {
-		return
-	}
-	std.Output(WARN, fmt.Sprintf(format, a...))
+// Info output the info.
+func Info(a ...interface{}) {
+	Output("[INFO]", fmt.Sprint(a...))
 }
 
-// Error output the debug info if currrent level is not less than ERROR.
-func Error(format string, a ...interface{}) {
-	if ERROR < std.level {
-		return
-	}
-	std.Output(ERROR, fmt.Sprintf(format, a...))
+// Infof output the formated info.
+func Infof(format string, a ...interface{}) {
+	Output("[INFO]", fmt.Sprintf(format, a...))
 }
 
-// Fatal output the debug info if currrent level is not less than Fatal.
-func Fatal(format string, a ...interface{}) {
-	if FATAL < std.level {
-		return
-	}
-	std.Output(FATAL, fmt.Sprintf(format, a...))
+// Fatal output the fatal info and exit the program.
+func Fatal(a ...interface{}) {
+	Output("[FATL]", fmt.Sprint(a...))
+	os.Exit(1)
+}
+
+// Fatal output the fatal info and exit the program.
+func Fatalf(format string, a ...interface{}) {
+	Output("[FATL]", fmt.Sprintf(format, a...))
+	os.Exit(1)
 }
