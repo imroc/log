@@ -155,15 +155,3 @@ func Info(a ...interface{}) {
 func Infof(format string, a ...interface{}) {
 	Output("[INFO]", fmt.Sprintf(format, a...))
 }
-
-// Fatal output the fatal info and exit the program.
-func Fatal(a ...interface{}) {
-	Output("[FATL]", fmt.Sprint(a...))
-	os.Exit(1)
-}
-
-// Fatal output the fatal info and exit the program.
-func Fatalf(format string, a ...interface{}) {
-	Output("[FATL]", fmt.Sprintf(format, a...))
-	os.Exit(1)
-}
