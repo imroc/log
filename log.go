@@ -29,9 +29,9 @@ const (
 	LstdFlags     = Ldate | Ltime | Lshortfile // initial values for the standard logger
 )
 
-var DEBUG bool
-var FLAG int = LstdFlags
-var OUT io.Writer = os.Stderr // destination for output
+var debug = true
+var flag int = LstdFlags
+var out io.Writer = os.Stderr // destination for output
 var mu sync.Mutex             // ensures atomic writes; protects the following fields
 var buf []byte                // for accumulating text to write
 
@@ -53,11 +53,11 @@ func itoa(i int, wid int) {
 }
 
 func formatHeader(t time.Time, level string, file string, line int) {
-	if FLAG&LUTC != 0 {
+	if flag&LUTC != 0 {
 		t = t.UTC()
 	}
-	if FLAG&(Ldate|Ltime|Lmicroseconds) != 0 {
-		if FLAG&Ldate != 0 {
+	if flag&(Ldate|Ltime|Lmicroseconds) != 0 {
+		if flag&Ldate != 0 {
 			year, month, day := t.Date()
 			itoa(year, 4)
 			buf = append(buf, '/')
@@ -66,14 +66,14 @@ func formatHeader(t time.Time, level string, file string, line int) {
 			itoa(day, 2)
 			buf = append(buf, ' ')
 		}
-		if FLAG&(Ltime|Lmicroseconds) != 0 {
+		if flag&(Ltime|Lmicroseconds) != 0 {
 			hour, min, sec := t.Clock()
 			itoa(hour, 2)
 			buf = append(buf, ':')
 			itoa(min, 2)
 			buf = append(buf, ':')
 			itoa(sec, 2)
-			if FLAG&Lmicroseconds != 0 {
+			if flag&Lmicroseconds != 0 {
 				buf = append(buf, '.')
 				itoa(t.Nanosecond()/1e3, 6)
 			}
@@ -84,8 +84,8 @@ func formatHeader(t time.Time, level string, file string, line int) {
 	buf = append(buf, level...)
 	buf = append(buf, ' ')
 
-	if FLAG&(Lshortfile|Llongfile) != 0 {
-		if FLAG&Lshortfile != 0 {
+	if flag&(Lshortfile|Llongfile) != 0 {
+		if flag&Lshortfile != 0 {
 			short := file
 			for i := len(file) - 1; i > 0; i-- {
 				if file[i] == '/' {
@@ -102,14 +102,14 @@ func formatHeader(t time.Time, level string, file string, line int) {
 	}
 }
 
-// Output outputs the string of with level to the writer.
-func Output(level string, s string) error {
+// output outputs the string of with level to the writer.
+func output(level string, s string) error {
 	now := time.Now() // get this early.
 	var file string
 	var line int
 	mu.Lock()
 	defer mu.Unlock()
-	if FLAG&(Lshortfile|Llongfile) != 0 {
+	if flag&(Lshortfile|Llongfile) != 0 {
 		// release lock while getting caller info - it's expensive.
 		mu.Unlock()
 		var ok bool
@@ -126,32 +126,57 @@ func Output(level string, s string) error {
 	if len(s) == 0 || s[len(s)-1] != '\n' {
 		buf = append(buf, '\n')
 	}
-	_, err := OUT.Write(buf)
+	_, err := out.Write(buf)
 	return err
+}
+
+// SetDebug enable or disable debug.
+func SetDebug(d bool) {
+	debug = d
+}
+
+// SetFlag set the output flag.
+func SetFlag(f int) {
+	flag = f
+}
+
+// SetOutput set the output.
+func SetOutput(o io.Writer) {
+	out = o
+}
+
+// SetFilename set the ouput filename.
+func SetFilename(name string) (err error) {
+	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return
+	}
+	SetOutput(file)
+	return
 }
 
 // Debug output the debug info if DEBUG is set to true.
 func Debug(a ...interface{}) {
-	if !DEBUG {
+	if !debug {
 		return
 	}
-	Output("[DEBG]", fmt.Sprint(a...))
+	output("[DEBG]", fmt.Sprint(a...))
 }
 
 // Debugf output the formated debug info if DEBUG is set to true.
 func Debugf(format string, a ...interface{}) {
-	if !DEBUG {
+	if !debug {
 		return
 	}
-	Output("[DEBG]", fmt.Sprintf(format, a...))
+	output("[DEBG]", fmt.Sprintf(format, a...))
 }
 
 // Info output the info.
 func Info(a ...interface{}) {
-	Output("[INFO]", fmt.Sprint(a...))
+	output("[INFO]", fmt.Sprint(a...))
 }
 
 // Infof output the formated info.
 func Infof(format string, a ...interface{}) {
-	Output("[INFO]", fmt.Sprintf(format, a...))
+	output("[INFO]", fmt.Sprintf(format, a...))
 }
