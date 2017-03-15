@@ -1,6 +1,6 @@
 log
 ==============
-log is a logging framework of Go. see [API](https://godoc.org/github.com/imroc/log).
+log is a simple and useful logging tool of Go. see [API](https://godoc.org/github.com/imroc/log).
 
 ## Features
  * light weight
