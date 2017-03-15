@@ -22,7 +22,6 @@ import (
 )
 
 func main() {
-	log.DEBUG = true
 	log.Debug("debug ", "message")
 	log.Infof("%s message", "info")
 }
@@ -34,9 +33,9 @@ output:
 ```
 ##### More Control
 ``` go
-file, _ := os.OpenFile("test.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 667)
-log.OUT = file
-log.FLAG = Ldate | Ltime | Llongfile
+log.SetFilename("test.log")
+log.SetFlag(log.Ldate | log.Ltime | log.Llongfile)
+log.SetDebug(false)
 ```
 ## LICENSE
 log is is distributed under the terms of the MIT License.
